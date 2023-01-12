@@ -6,8 +6,8 @@ version = "1.0.0"
 authors = ["NVIDIA"]
 
 # The title and description fields are primarily for displaying extension info in UI
-description = "A simple python extension capture deltas as review notes"
-title = "Create Review Notes"
+description = "A simple python extension that create a variant from list of payloads."
+title = "Create Variant"
 
 # Path (relative to the root) or content of readme markdown file for UI.
 readme = "docs/README.md"
@@ -38,7 +38,7 @@ icon = "data/icon.png"
 
 # Main python module this extension provides, it will be publicly available as "import aag.reviewnotes".
 [[python.module]]
-name = "aag.reviewnotes"
+name = "aag.variants"
 
 [[test]]
 # Extra dependencies only to be used during test run
