@@ -18,7 +18,7 @@ class AagReviewnotesExtension(omni.ext.IExt):
     # this extension is located on filesystem.
     def on_startup(self, ext_id):
 
-        print("[aag.reviewnotes] aag reviewnotes startup")
+        #print("[aag.reviewnotes] aag reviewnotes startup")
         self.capture_note_usecase = CaptureNote()
         self.create_variant_usecase = CreateVariantFromSelection()
 
@@ -26,7 +26,6 @@ class AagReviewnotesExtension(omni.ext.IExt):
         with self._window.frame:
             with ui.VStack():
                 label = ui.Label("")
-
 
                 def on_click_capture_notes():
                     self.capture_note_usecase.capture_note()
