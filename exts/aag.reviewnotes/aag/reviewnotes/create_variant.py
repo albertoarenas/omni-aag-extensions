@@ -6,20 +6,22 @@ import carb
 class CreateVariantFromSelection():
 
     def __init__(self):
-        self._stage: Usd.Stage = omni.usd.get_context().get_stage()
+        self._stage = omni.usd.get_context().get_stage()
 
     def create_variant(self):
-        print("create_variant")
+
+        self._stage = omni.usd.get_context().get_stage()
 
         # Get selected prim
         selected_prim_paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         print(selected_prim_paths)
-        if not selected_prim_paths or len(selected_prim_paths)>1:
+        if not selected_prim_paths or len(selected_prim_paths) > 1:
             carb.log_error("ERROR: Nothing was selected or multiple selection.")
             return
-
-        print(selected_prim_paths[0])
-        selected_prim = self._stage.GetPrimAtPath(Sdf.Path(selected_prim_paths[0]))
+        
+        selected_prim_path = selected_prim_paths[0]
+        print(selected_prim_path)
+        selected_prim = self._stage.GetPrimAtPath(Sdf.Path(selected_prim_path))
         selected_prim_name = selected_prim.GetName()
         
         # Get selected prim children list 
