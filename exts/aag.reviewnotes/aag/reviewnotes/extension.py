@@ -2,6 +2,7 @@ import omni.ext
 import omni.ui as ui
 
 from .capture_note import CaptureNote
+from .create_variant import CreateVariantFromSelection
 
 # Functions and vars are available to other extension as usual in python: `example.python_ext.some_public_function(x)`
 def some_public_function(x: int):
@@ -19,6 +20,7 @@ class AagReviewnotesExtension(omni.ext.IExt):
 
         print("[aag.reviewnotes] aag reviewnotes startup")
         self.capture_note_usecase = CaptureNote()
+        self.create_variant_usecase = CreateVariantFromSelection()
 
         self._window = ui.Window("Review Notes", width=300, height=300)
         with self._window.frame:
@@ -26,11 +28,14 @@ class AagReviewnotesExtension(omni.ext.IExt):
                 label = ui.Label("")
 
 
-                def on_click():
+                def on_click_capture_notes():
                     self.capture_note_usecase.capture_note()
+                def on_click_create_variant():
+                    self.create_variant_usecase.create_variant()
 
-                with ui.HStack():
-                    ui.Button("Capture Notes", clicked_fn=on_click)
+                with ui.VStack():
+                    ui.Button("Capture Notes", clicked_fn=on_click_capture_notes)
+                    ui.Button("Create Variant", clicked_fn=on_click_create_variant)
 
     def on_shutdown(self):
         print("[aag.reviewnotes] aag reviewnotes shutdown")
