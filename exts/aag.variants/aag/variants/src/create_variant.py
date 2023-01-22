@@ -17,7 +17,7 @@ class CreateVariantFromSelection:
 
     def create_variant_from_selection(
         self,
-        variant_set_name: str = "GeomSet",
+        variant_set_name: str = "GeomVis",
         variant_prim_name: str = "VariantPrim",
         type: VariantType = VariantType.PAYLOAD,
     ):
