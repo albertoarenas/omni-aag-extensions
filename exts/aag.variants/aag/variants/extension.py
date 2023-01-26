@@ -4,6 +4,7 @@ import omni.ext
 import omni.ui as ui
 
 from .src.create_variant import CreateVariantFromSelection
+from .src.create_props import CreatePropsFrom3DSmax
 
 VARIANTS_PNG = Path(__file__).parent.parent.parent / "data" / "variants.png"
 
@@ -24,6 +25,7 @@ class AagVariantsExtension(omni.ext.IExt):
         print("[aag.reviewnotes] aag reviewnotes startup")
 
         self.create_variant_usecase = CreateVariantFromSelection()
+        self.create_props_usecase = CreatePropsFrom3DSmax()
 
         self._window = ui.Window("Variants", width=300, height=300)
         with self._window.frame:
@@ -41,8 +43,15 @@ class AagVariantsExtension(omni.ext.IExt):
                 def on_click_create_variant():
                     self.create_variant_usecase.create_variant_from_selection()
 
+                def on_click_create_props():
+                    PROP_EXPORT_PATH = "omniverse://586893a3-c6df-4743-bf39-08a38b37a332.cne.ngc.nvidia.com/Projects/LiveEdit/Friday_Live/DirectorLive/RepositoryStaging/3DSMax/buildings"
+                    PROP_PATH = "omniverse://586893a3-c6df-4743-bf39-08a38b37a332.cne.ngc.nvidia.com/Projects/LiveEdit/Friday_Live/DirectorLive/RepositoryStaging/assets/prop/buildings"
+                    MATERIAL_OVER_PATH = "omniverse://586893a3-c6df-4743-bf39-08a38b37a332.cne.ngc.nvidia.com/Projects/LiveEdit/Friday_Live/DirectorLive/RepositoryStaging/assets/prop/buildings/bldg_looks_render/bldg_looks_render.usd"
+                    self.create_props_usecase.create_props(PROP_EXPORT_PATH, PROP_PATH, MATERIAL_OVER_PATH)
+
                 with ui.VStack():
                     ui.Button("Create Variant", height=40, clicked_fn=lambda: on_click_create_variant())
+                    ui.Button("Create Props", height=40, clicked_fn=lambda: on_click_create_props())
 
     def on_shutdown(self):
         print("[aag.reviewnotes] aag reviewnotes shutdown")
