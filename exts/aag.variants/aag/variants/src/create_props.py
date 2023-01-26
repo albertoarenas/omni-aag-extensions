@@ -114,6 +114,10 @@ class CreatePropsFrom3DSmax():
             render_asset_prop_url = f"{asset_prop_render_folder_url}/{render_exported_prop_file}"
             self.create_render_mesh_usd(render_exported_prop_url, render_asset_prop_url, material_over_url)
 
+            # Create variants
+            asset_prop_variant_url = f"{asset_prop_folder_url}/{prop_folder_name}_variant.usd"
+            self.create_variants(proxy_asset_prop_url, render_asset_prop_url, asset_prop_variant_url)
+
 
 
             
@@ -160,6 +164,37 @@ class CreatePropsFrom3DSmax():
                 root_layer.subLayerPaths.append(sub_layer.identifier)
         except:
             logger.warning(f"Layer exists: {material_usd_url}")
+
+        stage.Save()
+        stage = None
+
+        logger.info(f"Saved: {asset_usd_url}")
+
+
+    def create_variants(self, asset_proxy_usd_url:str, asset_render_usd_url:str, asset_usd_url:str):
+
+        try:
+            stage = Usd.Stage.CreateNew(asset_usd_url)
+        except:
+            stage = Usd.Stage.Open(asset_usd_url)
+
+        logger.info(f"Opened: {asset_usd_url}")
+        
+        UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+        world_xform_prim = UsdGeom.Xform.Define(stage, "/World")
+        world_prim: Usd.Prim = stage.GetPrimAtPath("/World")
+        stage.SetDefaultPrim(world_prim)
+        
+        vset = world_prim.GetVariantSets().AddVariantSet('modelSet')
+        vset.AddVariant('proxy')
+        vset.SetVariantSelection('proxy')
+        with vset.GetVariantEditContext():
+            world_prim.GetPayloads().AddPayload(asset_proxy_usd_url)
+
+        vset.AddVariant('render')
+        vset.SetVariantSelection('render')
+        with vset.GetVariantEditContext():
+            world_prim.GetPayloads().AddPayload(asset_render_usd_url)
 
         stage.Save()
         stage = None
