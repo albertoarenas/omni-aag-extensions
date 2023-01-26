@@ -4,6 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import omni.client
+import os
 
 from pxr import Usd, UsdGeom, Gf, Sdf
 
@@ -70,11 +71,13 @@ class CreatePropsFrom3DSmax():
     def __init__(self):
         logger.info("CreatePropsFrom3DSmax created")
 
-    def create_props(self, props_export_url:str, assets_prop_url:str, material_over_url:str):
+    def create_props(self, props_export_url:str, assets_prop_url:str, material_over_url:str, asset_variant_name:str):
 
         # Get export folder
         props_folder_names = NucleusFS.list_folders(props_export_url)
         
+        asset_prop_variant_urls = []
+
         # Go through all export folders
         for prop_folder_name in props_folder_names:
             
@@ -104,22 +107,53 @@ class CreatePropsFrom3DSmax():
             # Create proxy mesh usd
             proxy_exported_prop_url = f"{exported_prop_folder_url}/{proxy_exported_prop_file}"
             proxy_asset_prop_url = f"{asset_prop_proxy_folder_url}/{proxy_exported_prop_file}"
-            #if not NucleusFS.file_exists(proxy_asset_prop_url):
-            self.create_proxy_mesh_usd(proxy_exported_prop_url, proxy_asset_prop_url)
+            if not NucleusFS.file_exists(proxy_asset_prop_url):
+                self.create_proxy_mesh_usd(proxy_exported_prop_url, proxy_asset_prop_url)
             
             # Create render mesh usd
             render_exported_prop_file =   exported_prop_files[1] if "proxy" in exported_prop_files[0] else exported_prop_files[0]
             logger.info(f"Render: {render_exported_prop_file}")
             render_exported_prop_url = f"{exported_prop_folder_url}/{render_exported_prop_file}"
             render_asset_prop_url = f"{asset_prop_render_folder_url}/{render_exported_prop_file}"
-            self.create_render_mesh_usd(render_exported_prop_url, render_asset_prop_url, material_over_url)
+            if not NucleusFS.file_exists(render_exported_prop_url):
+                self.create_render_mesh_usd(render_exported_prop_url, render_asset_prop_url, material_over_url)
 
             # Create variants
             asset_prop_variant_url = f"{asset_prop_folder_url}/{prop_folder_name}_variant.usd"
-            self.create_variants(proxy_asset_prop_url, render_asset_prop_url, asset_prop_variant_url)
+            asset_prop_variant_urls.append(asset_prop_variant_url)
+            self.create_prop_variant(proxy_asset_prop_url, render_asset_prop_url, asset_prop_variant_url)
+
+        asset_variant_usd_url = f"{assets_prop_url}/{asset_variant_name}"
+        self.create_asset_variant(asset_variant_usd_url, asset_prop_variant_urls)
+
+    def create_asset_variant(self, asset_variant_usd_url:str, asset_variant_urls:List[str]):
+
+        try:
+            stage = Usd.Stage.CreateNew(asset_variant_usd_url)
+        except:
+            stage = Usd.Stage.Open(asset_variant_usd_url)
+
+        logger.info(f"Opened: {asset_variant_usd_url}")
+        
+        UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+        world_xform_prim = UsdGeom.Xform.Define(stage, "/World")
+        world_prim: Usd.Prim = stage.GetPrimAtPath("/World")
+        stage.SetDefaultPrim(world_prim)
+        
+        vset = world_prim.GetVariantSets().AddVariantSet('assetSet')
+        for asset_variant_url in asset_variant_urls:
+            variant_set_name = os.path.splitext(os.path.basename(asset_variant_url))[0]
+            vset.AddVariant(variant_set_name)
+            vset.SetVariantSelection(variant_set_name)
+            with vset.GetVariantEditContext():
+                world_prim.GetPayloads().AddPayload(asset_variant_url)
 
 
 
+        stage.Save()
+        stage = None
+
+        logger.info(f"Saved: {asset_variant_usd_url}")
             
     def create_proxy_mesh_usd(self, exported_usd_url:str, asset_usd_url:str):
 
@@ -171,7 +205,7 @@ class CreatePropsFrom3DSmax():
         logger.info(f"Saved: {asset_usd_url}")
 
 
-    def create_variants(self, asset_proxy_usd_url:str, asset_render_usd_url:str, asset_usd_url:str):
+    def create_prop_variant(self, asset_proxy_usd_url:str, asset_render_usd_url:str, asset_usd_url:str):
 
         try:
             stage = Usd.Stage.CreateNew(asset_usd_url)
