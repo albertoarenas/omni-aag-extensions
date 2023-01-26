@@ -101,17 +101,20 @@ class CreatePropsFrom3DSmax():
             proxy_exported_prop_file =   exported_prop_files[0] if "proxy" in exported_prop_files[0] else exported_prop_files[1]
             logger.info(f"Proxy: {proxy_exported_prop_file}")
 
+            # Create proxy mesh usd
             proxy_exported_prop_url = f"{exported_prop_folder_url}/{proxy_exported_prop_file}"
             proxy_asset_prop_url = f"{asset_prop_proxy_folder_url}/{proxy_exported_prop_file}"
             #if not NucleusFS.file_exists(proxy_asset_prop_url):
             self.create_proxy_mesh_usd(proxy_exported_prop_url, proxy_asset_prop_url)
             
-            
+            # Create render mesh usd
             render_exported_prop_file =   exported_prop_files[1] if "proxy" in exported_prop_files[0] else exported_prop_files[0]
             logger.info(f"Render: {render_exported_prop_file}")
             render_exported_prop_url = f"{exported_prop_folder_url}/{render_exported_prop_file}"
             render_asset_prop_url = f"{asset_prop_render_folder_url}/{render_exported_prop_file}"
             self.create_render_mesh_usd(render_exported_prop_url, render_asset_prop_url, material_over_url)
+
+
 
             
     def create_proxy_mesh_usd(self, exported_usd_url:str, asset_usd_url:str):
@@ -120,6 +123,8 @@ class CreatePropsFrom3DSmax():
             stage = Usd.Stage.CreateNew(asset_usd_url)
         except:
             stage = Usd.Stage.Open(asset_usd_url)
+
+        logger.info(f"Opened: {asset_usd_url}")
         
         UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
         world_xform_prim = UsdGeom.Xform.Define(stage, "/World")
@@ -129,6 +134,8 @@ class CreatePropsFrom3DSmax():
         stage.Save()
         stage = None
 
+        logger.info(f"Saved: {asset_usd_url}")
+
 
     def create_render_mesh_usd(self, exported_usd_url:str, asset_usd_url:str, material_usd_url:str):
 
@@ -136,6 +143,8 @@ class CreatePropsFrom3DSmax():
             stage = Usd.Stage.CreateNew(asset_usd_url)
         except:
             stage = Usd.Stage.Open(asset_usd_url)
+
+        logger.info(f"Opened: {asset_usd_url}")
         
         UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
         world_xform_prim = UsdGeom.Xform.Define(stage, "/World")
@@ -145,14 +154,17 @@ class CreatePropsFrom3DSmax():
         
         try:
             root_layer: Sdf.Layer = stage.GetRootLayer()
-            sub_layer: Sdf.Layer = Sdf.Layer.CreateNew(material_usd_url)
+            sub_layer: Sdf.Layer = Sdf.Layer.FindOrOpen(material_usd_url)
             # You can use standard python list.insert to add the subLayer to any position in the list
-            root_layer.subLayerPaths.append(sub_layer.identifier)
+            if sub_layer not in root_layer.subLayerPaths:
+                root_layer.subLayerPaths.append(sub_layer.identifier)
         except:
-            pass
+            logger.warning(f"Layer exists: {material_usd_url}")
 
         stage.Save()
         stage = None
+
+        logger.info(f"Saved: {asset_usd_url}")
             
 
 
