@@ -3,6 +3,7 @@ from typing import List
 import logging
 logger = logging.getLogger(__name__)
 
+import omni.ui as ui
 import omni.client
 import os
 
@@ -69,7 +70,47 @@ class CreatePropsException(Exception):
 class CreatePropsFrom3DSmax():
 
     def __init__(self):
+        self.window = None
         logger.info("CreatePropsFrom3DSmax created")
+
+    def build_ui(self):
+
+        logger.info("CREATE UI")
+
+        # create  a window
+        window_flags = ui.WINDOW_FLAGS_NO_SCROLLBAR
+        self.window = ui.Window("Create Variant Set from Selection", width=300, height=180, flags=window_flags)
+
+        with self.window.frame:
+            
+            def setText(label, text):
+                '''Sets text on the label'''
+                # This function exists because lambda cannot contain assignment
+                label.text = f"You wrote '{text}'"
+
+            def drop_accept(url):
+                logger.info(f"drop_accept:{url}")
+                return True
+
+            def drop(widget, event):
+                widget.text = event.mime_data
+
+            with ui.VStack():
+                field = ui.StringField()
+                
+                label = ui.Label("")
+                field.model.add_value_changed_fn(
+                    lambda m, label=label: setText(label, m.get_value_as_string()))
+
+                field.set_accept_drop_fn(drop_accept)
+                field.set_drop_fn(lambda a,w=label: drop(w,a))
+
+                with ui.HStack():
+                    width_label = ui.Label("Width (cm): ", width=ui.Fraction(1))
+                    self.width_model = ui.SimpleFloatModel(100, min=25, max=200)
+                    width_field = ui.FloatField(width=ui.Fraction(2), model=self.width_model)
+
+
 
     def create_props(self, props_export_url:str, assets_prop_url:str, material_over_url:str, asset_variant_name:str):
 

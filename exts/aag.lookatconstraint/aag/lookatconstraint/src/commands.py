@@ -5,6 +5,7 @@ import omni.kit.commands
 from pxr import Gf, Sdf, Usd, UsdGeom, Vt
 from enum import Enum
 
+import numpy as np
 
 class AxisId(Enum):
     XPOS = 0
@@ -39,9 +40,9 @@ class CreateLookAtConstraint(omni.kit.commands.Command):
         self.eye_path = eye
         self.target_path = target
 
-        
-
         # self._usd_undo = None
+
+
     
     def get_selection(self):
         """
@@ -105,18 +106,50 @@ class CreateLookAtConstraint(omni.kit.commands.Command):
         #    carb.log_info("Aim constraint created")
 
         rotation_trm = Gf.Transform(aimMtx).GetRotation()
-        # rotation.angle = -1.0 * rotation.angle
-        print(rotation_trm)
-        rotation_vec = Gf.Vec3d(rotation_trm.axis * rotation_trm.angle)
-
+        print(f"Rotation Transform:{rotation_trm}")
+        
+        # rotation_euler = rotation_trm.Decompose(Gf.Vec3d.XAxis(), Gf.Vec3d.YAxis(), Gf.Vec3d.ZAxis())
+        # rotation_vec2 = Gf.Vec3d(rotation_euler)
+        # print(f"Rotation Vec2:{rotation_vec2}")
 
         # self.eye = stage.GetPrimAtPath(self.eye_path)
         # hasXformOp = self.eye.HasAttribute('xformOp:rotateXYZ')
         # rotateYXZ = self.eye.GetAttribute('xformOp:rotateXYZ')
         # rotateYXZ.Set(rotation_vec)
 
-        property_path = f"{self.eye_path}.xformOp:rotateYXZ"
-        self._change_property(property_path, rotation_vec)
+        # quaternion: Gf.Quaternion = rotation_trm.GetQuaternion()
+
+        # w = quaternion.GetReal()
+        # x, y, z = [*Gf.Vec3d(quaternion.GetImaginary())]
+
+        # # Convert Quat to Euler Vectorized
+        # y_sqr = y * y
+
+        # t0 = 2.0 * (w * x + y * z)
+        # t1 = 1.0 - 2.0 * (x * x + y_sqr)
+        # roll = np.arctan2(t0, t1)
+
+        # t2 = 2.0 * (w * y - z * x)
+        # pitch = -1 * np.arcsin(t2)
+
+        # t3 = 2.0 * (w * z + x * y)
+        # t4 = 1.0 - 2.0 * (y_sqr + z * z)
+        # yaw = np.arctan2(t3, t4)
+
+        # rotation_vec3 = Gf.Vec3d(Gf.RadiansToDegrees(roll), Gf.RadiansToDegrees(pitch), Gf.RadiansToDegrees(yaw))
+        # print(f"Rotation Vec3:{rotation_vec3}")
+        
+        
+        # property_path = f"{self.eye_path}.xformOp:rotateYXZ"
+        # self._change_property(property_path, rotation_vec2)
+        eye_translation = eye_matrix.ExtractTranslation()
+        eye_matrix.SetRotateOnly(rotation_trm)
+        eye_matrix.SetTranslateOnly(eye_translation)
+        omni.kit.commands.execute(
+            "TransformPrimCommand",
+            path=self.eye_path,
+            new_transform_matrix=eye_matrix,)
+        
 
         # eye_xform = UsdGeom.Xformable(self.eye)
         # transform = eye_xform.AddTransformOp()
