@@ -79,7 +79,7 @@ class CreatePropsFrom3DSmax():
 
         # create  a window
         window_flags = ui.WINDOW_FLAGS_NO_SCROLLBAR
-        self.window = ui.Window("Create Variant Set from Selection", width=300, height=180, flags=window_flags)
+        self.window = ui.Window("Create Variant Set from Selection", width=500, height=180, flags=window_flags)
 
         with self.window.frame:
             
@@ -87,28 +87,91 @@ class CreatePropsFrom3DSmax():
                 '''Sets text on the label'''
                 # This function exists because lambda cannot contain assignment
                 label.text = f"You wrote '{text}'"
+                
 
             def drop_accept(url):
                 logger.info(f"drop_accept:{url}")
                 return True
 
-            def drop(widget, event):
-                widget.text = event.mime_data
+            def drop(event, model):
+                model.set_value(event.mime_data)
 
             with ui.VStack():
-                field = ui.StringField()
-                
-                label = ui.Label("")
-                field.model.add_value_changed_fn(
-                    lambda m, label=label: setText(label, m.get_value_as_string()))
-
-                field.set_accept_drop_fn(drop_accept)
-                field.set_drop_fn(lambda a,w=label: drop(w,a))
+                label_width = 90
+                with ui.HStack():
+                    source_path_label = ui.Label("Source Path: ", height=20, width=label_width)
+                    self.source_path_model = ui.SimpleStringModel()
+                    field = ui.StringField(width=ui.Fraction(4), height=20, alignment=ui.Alignment.LEFT, model = self.source_path_model)
+                    
+                    field.set_accept_drop_fn(drop_accept)
+                    field.set_drop_fn(lambda event, model=self.source_path_model: drop(event, model))
 
                 with ui.HStack():
-                    width_label = ui.Label("Width (cm): ", width=ui.Fraction(1))
-                    self.width_model = ui.SimpleFloatModel(100, min=25, max=200)
-                    width_field = ui.FloatField(width=ui.Fraction(2), model=self.width_model)
+                    asset_path_label = ui.Label("Asset Path: ", height=20, width=label_width)
+                    self.asset_path_model = ui.SimpleStringModel()
+                    field = ui.StringField(width=ui.Fraction(4), height=20, alignment=ui.Alignment.LEFT, model = self.asset_path_model)
+                    
+
+                    field.set_accept_drop_fn(drop_accept)
+                    field.set_drop_fn(lambda event, model=self.asset_path_model: drop(event, model))
+
+                with ui.HStack():
+                    matlib_path_label = ui.Label("Matlib Path: ", height=20, width=label_width)
+                    self.matlib_path_model = ui.SimpleStringModel()
+                    field = ui.StringField(width=ui.Fraction(4), height=20, alignment=ui.Alignment.LEFT, model = self.matlib_path_model)
+                    
+
+                    field.set_accept_drop_fn(drop_accept)
+                    field.set_drop_fn(lambda event, model=self.matlib_path_model: drop(event, model))
+
+                with ui.HStack():
+                    variant_name_label = ui.Label("Variant Name: ", height=20, width=label_width)
+                    self.variant_name_model = ui.SimpleStringModel('asset_variant')
+                    field = ui.StringField(width=ui.Fraction(4), height=20, alignment=ui.Alignment.LEFT, model = self.variant_name_model)
+
+                with ui.HStack():
+                    ui.Button("Create Asset Variant", clicked_fn=self.on_create_assets_variant)
+
+    def _show_error(self, msg):
+        try:
+            import omni.kit.notification_manager
+
+            omni.kit.notification_manager.post_notification(msg, hide_after_timeout=False)
+        except:
+            logging.error(msg)
+
+
+    def on_create_assets_variant(self):
+
+        source_path = self.source_path_model.as_string
+        if (not source_path):
+            self._show_error(f"Source Path is not defined")
+            return
+
+        asset_path = self.asset_path_model.as_string
+        if (not asset_path):
+            self._show_error(f"Asset Path is not defined")
+            return
+        
+        matlib_path = self.matlib_path_model.as_string
+        if (not matlib_path):
+            self._show_error(f"Matlib Path is not defined")
+            return
+        
+        variant_name = self.variant_name_model.as_string
+        if (not matlib_path):
+            self._show_error(f"Variant Name is not defined")
+            return
+        
+        variant_name = f"{variant_name}.usd"
+
+
+        self.create_props(source_path, 
+                          asset_path,
+                          matlib_path,
+                          variant_name)
+
+
 
 
 
@@ -156,8 +219,9 @@ class CreatePropsFrom3DSmax():
             logger.info(f"Render: {render_exported_prop_file}")
             render_exported_prop_url = f"{exported_prop_folder_url}/{render_exported_prop_file}"
             render_asset_prop_url = f"{asset_prop_render_folder_url}/{render_exported_prop_file}"
-            if not NucleusFS.file_exists(render_exported_prop_url):
+            if not NucleusFS.file_exists(render_asset_prop_url):
                 self.create_render_mesh_usd(render_exported_prop_url, render_asset_prop_url, material_over_url)
+
 
             # Create variants
             asset_prop_variant_url = f"{asset_prop_folder_url}/{prop_folder_name}_variant.usd"
