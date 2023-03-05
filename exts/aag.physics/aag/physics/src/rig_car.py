@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 import logging
 logger = logging.getLogger(__name__)
 
-from pxr import Usd, UsdGeom, Sdf, UsdPhysics
+from pxr import Usd, UsdGeom, Sdf, Gf, UsdPhysics
 
 import omni.kit.commands
 import omni.usd
@@ -89,7 +89,7 @@ class RigCarPhysicsUtils():
     @staticmethod
     def find_all_prim_contains_pattern(stage:Usd.Stage, pattern) -> List[Usd.Prim]:
         all_prims = []
-        for prim in stage.TraverseAll():
+        for prim in stage.Traverse(Usd.TraverseInstanceProxies(Usd.PrimIsActive and Usd.PrimIsDefined and Usd.PrimIsLoaded)):
             if pattern in prim.GetName():
                 all_prims.append(prim)
         return all_prims
@@ -199,23 +199,21 @@ class RigCarPhysicsUtils():
                 if mass_info['apply_parent']:
                     parent_path = cur_prim.GetPath().GetParentPath()
                     prim_add_mass = stage.GetPrimAtPath(parent_path)
+
+                RigCarPhysicsUtils.create_and_update_mass(prim_add_mass, mass_info['mass'])
     
-                # Check if mass is already present if not
-                if not prim_add_mass.HasAttribute('physics:mass'):
+                
+    @staticmethod
+    def create_and_update_mass(prim, mass):
+        # Check if mass is already present if not
+        if not prim.HasAttribute('physics:mass'):
 
-                    # Add mass
-                    omni.kit.commands.execute('AddPhysicsComponent',
-                        usd_prim=prim_add_mass,
-                        component='PhysicsMassAPI')
-            
-                prim_add_mass.GetAttribute('physics:mass').Set(mass_info['mass'])
-
-                # omni.kit.commands.execute('ChangeProperty',
-                #     prop_path=Sdf.Path('/World/Geo/wheels_F/Mesh_44309_dat_0_001.physics:mass'),
-                #     value=5.87,
-                #     prev=0.0,
-                #     target_layer=Sdf.Find('omniverse://586893a3-c6df-4743-bf39-08a38b37a332.cne.ngc.nvidia.com/Projects/LiveEdit/Friday_Live/DirectorLive/RepositoryStaging/assets/prop/lego/lego_car_v1/lego_car_v1_physics.usd'),
-                #     usd_context_name=Usd.Stage.Open(rootLayer=Sdf.Find('omniverse://586893a3-c6df-4743-bf39-08a38b37a332.cne.ngc.nvidia.com/Projects/LiveEdit/Friday_Live/DirectorLive/RepositoryStaging/assets/prop/lego/lego_car_v1/lego_car_v1_asset.usd'), sessionLayer=Sdf.Find('anon:000002116A879E50'), pathResolverContext=None))
+            # Add mass
+            omni.kit.commands.execute('AddPhysicsComponent',
+                usd_prim=prim,
+                component='PhysicsMassAPI')
+    
+        prim.GetAttribute('physics:mass').Set(mass)
 
 
 
@@ -238,6 +236,64 @@ class RigCarPhysicsUtils():
         all_gear_joins_info = [{'from':'gear_drive', 'to':'wheels_F', 'gear_ratio':-0.33}]
         for gear_join_info in all_gear_joins_info:
             RigCarPhysicsUtils.create_gear_join(gear_join_info['from'], gear_join_info['to'], gear_join_info['gear_ratio'])
+
+        stage:Usd.Stage = omni.usd.get_context().get_stage()
+        wheel_mesh_id = '44309'
+        all_wheel_meshes = RigCarPhysicsUtils.find_all_prim_contains_pattern(stage, wheel_mesh_id)
+        for wheel_mesh in all_wheel_meshes:
+            RigCarPhysicsUtils.replace_wheels_colliders(wheel_mesh)
+
+
+
+    @staticmethod
+    def replace_wheels_colliders(wheel_prim:Usd.Prim):
+
+        stage:Usd.Stage = omni.usd.get_context().get_stage()
+
+        translation = Gf.Vec3d()
+        if wheel_prim.HasAttribute('xformOp:translate'):
+            translation = wheel_prim.GetAttribute('xformOp:translate').Get()
+            logger.info(f"Wheel translation: {translation}")
+        
+        # Create collider name and path
+        wheel_prim_parent_path:Sdf.Path = wheel_prim.GetPath().GetParentPath()
+        new_collider_name = f"{wheel_prim.GetName()}_collider"
+        new_collider_path = wheel_prim_parent_path.AppendPath(new_collider_name)
+
+        # Create collider shape prim
+        wheel_radius = 2.23
+        wheel_height = 2.16
+        omni.kit.commands.execute('CreatePrimWithDefaultXform',
+            prim_type='Cylinder',
+            prim_path=str(new_collider_path),
+            attributes={'radius': wheel_radius, 'height': wheel_height},
+            select_new_prim=True)
+        
+        # Apply translation to the collider
+        new_collider_prim:Usd.Prim = stage.GetPrimAtPath(new_collider_path)
+        new_collider_prim.GetAttribute('xformOp:translate').Set(translation)
+        
+
+        # Add Physics collider
+        omni.kit.commands.execute('AddPhysicsComponent',
+                                   usd_prim=new_collider_prim,
+                                   component='PhysicsCollisionAPI')
+        
+        # Get mass info
+        mass = wheel_prim.GetAttribute('physics:mass').Get()
+        RigCarPhysicsUtils.create_and_update_mass(new_collider_prim, mass)
+
+        # Remove Collision from the wheel
+        omni.kit.commands.execute('RemovePhysicsComponent',
+            usd_prim=wheel_prim,
+            component='PhysicsCollisionAPI',
+            multiple_api_token=None)
+
+        # Hide New Collider
+        omni.kit.commands.execute('ToggleVisibilitySelectedPrims',
+        selected_paths=[str(new_collider_path)])
+
+
 
 
     @staticmethod
@@ -300,6 +356,15 @@ class RigCarPhysicsUtils():
                                       destructive=False)
 
 
+
+
+
+
+
+
+
+
+
     @staticmethod
     def create_fixed_join(from_prim_name, to_prim_name):
 
@@ -327,7 +392,7 @@ class RigCarPhysicsUtils():
 
 
     @staticmethod
-    def create_revolute_joins(from_prim_name="chassis", to_prim_name="wheels_B"):
+    def create_revolute_joins(from_prim_name="chassis", to_prim_name="wheels_B", axis_name='Z'):
         logger.info("rig_wheels()")
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
@@ -346,7 +411,7 @@ class RigCarPhysicsUtils():
                                                         from_prim=from_prim,
                                                         to_prim=to_prim)
             
-            new_joint.GetAttribute("physics:axis").Set('Z')
+            new_joint.GetAttribute("physics:axis").Set(axis_name)
 
             wheels_prim_path:Sdf.Path = to_prim.GetPath()
             new_joint_path = wheels_prim_path.AppendPath(new_joint_name)
