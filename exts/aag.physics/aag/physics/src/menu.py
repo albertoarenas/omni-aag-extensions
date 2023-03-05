@@ -46,7 +46,8 @@ class PhysicsMenu:
         RigCarPhysicsUtils.create_physics_layer()
         RigCarPhysicsUtils.create_rigidbodies_colliders()
         RigCarPhysicsUtils.create_collision_group()
-        RigCarPhysicsUtils.rig_wheels()
+        RigCarPhysicsUtils.create_masses()
+        RigCarPhysicsUtils.rig_car_joins()
         
 
 
