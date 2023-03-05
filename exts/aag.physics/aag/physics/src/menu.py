@@ -10,6 +10,7 @@ import omni.usd
 
 # from .commands import CreateLookAtConstraint
 # from .lookat_constraint import LookAtConstraint
+from .rig_car import RigCarPhysicsUtils
 
 class PhysicsMenu:
     def __init__(self):
@@ -42,6 +43,10 @@ class PhysicsMenu:
     def _rig_car_on_clicked(self):
         #omni.kit.commands.execute("CreateLookAtConstraint", eye=None, target=None)
         logger.info("_rig_car_on_clicked")
+        RigCarPhysicsUtils.create_physics_layer()
+        RigCarPhysicsUtils.create_rigidbodies_colliders()
+        RigCarPhysicsUtils.create_collision_group()
+        RigCarPhysicsUtils.rig_wheels()
         
 
 
