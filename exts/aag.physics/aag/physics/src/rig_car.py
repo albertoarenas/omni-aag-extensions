@@ -1,5 +1,6 @@
 import re
 import pathlib
+import json
 from typing import List, Optional, Union
 
 import logging
@@ -9,11 +10,25 @@ from pxr import Usd, UsdGeom, Sdf, Gf, UsdPhysics
 
 import omni.kit.commands
 import omni.usd
-
+import omni.client
 
 class RigCarRecipe():
-    pass
+    
+    def __init__(self):
+        self.url = None
+        self.json_data = None
 
+    def load(self, url:str):
+        self.url = url
+        (result, version, content) = omni.client.read_file(self.url)
+        if result == omni.client.Result.OK:
+            self.json_data = json.loads(memoryview(content).tobytes())
+
+    def __str__(self):
+        if self.json_data:
+            return json.dumps(self.json_data, indent=4)
+        else:
+            return ""
 
 
 class RigCarPhysicsUtils():

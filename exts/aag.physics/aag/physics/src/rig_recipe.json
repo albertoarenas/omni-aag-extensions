@@ -1,0 +1,105 @@
+{
+    "geometry_root_prim": "Geo",
+    "physics_layer_suffix": "physics",
+    "all_fixed_joins_info": [
+        {
+            "from": "chassis",
+            "to": "motor_body"
+        },
+        {
+            "from": "chassis",
+            "to": "battery"
+        }
+    ],
+    "all_forces_info": [
+        {
+            "prim_name": "wheels_F"
+        },
+        {
+            "prim_name": "gear_drive"
+        }
+    ],
+    "all_gear_joins_info": [
+        {
+            "gear_ratio": 3,
+            "from": "gear_drive",
+            "to": "wheels_F"
+        }
+    ],
+    "all_mass_info": [
+        {
+            "mass": 0.2,
+            "": "11955",
+            "apply_parent": false
+        },
+        {
+            "mass": 0.43,
+            "": "47157",
+            "apply_parent": false
+        },
+        {
+            "mass": 1.65,
+            "": "23948",
+            "apply_parent": false
+        },
+        {
+            "mass": 2.27,
+            "": "3034",
+            "apply_parent": false
+        },
+        {
+            "mass": 0.64,
+            "": "32530",
+            "apply_parent": false
+        },
+        {
+            "mass": 1.17,
+            "": "3648",
+            "apply_parent": false
+        },
+        {
+            "mass": 5.87,
+            "": "3703",
+            "apply_parent": false
+        },
+        {
+            "mass": 11.15,
+            "": "44309",
+            "apply_parent": false
+        },
+        {
+            "mass": 0.43,
+            "": "4519",
+            "apply_parent": false
+        },
+        {
+            "mass": 4.33,
+            "": "54087",
+            "apply_parent": false
+        },
+        {
+            "mass": 33.5,
+            "": "59143",
+            "apply_parent": true
+        },
+        {
+            "mass": 83.94,
+            "": "87513",
+            "apply_parent": true
+        }
+    ],
+    "all_revolute_joins_info": [
+        {
+            "from": "chassis",
+            "to": "wheels_B"
+        },
+        {
+            "from": "chassis",
+            "to": "wheels_F"
+        },
+        {
+            "from": "motor_body",
+            "to": "gear_drive"
+        }
+    ]
+}
