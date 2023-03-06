@@ -11,6 +11,10 @@ import omni.kit.commands
 import omni.usd
 
 
+class RigCarRecipe():
+    pass
+
+
 
 class RigCarPhysicsUtils():
 
@@ -20,9 +24,9 @@ class RigCarPhysicsUtils():
     def __init__(self):
         pass
 
+    
     @staticmethod
-    def create_physics_layer():
-        
+    def create_physics_layer():   
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         
         # Get the root layer
@@ -80,7 +84,7 @@ class RigCarPhysicsUtils():
 
 
     @staticmethod
-    def find_prim_by_name(stage:Usd.Stage, prim_name):
+    def find_prim_by_name(stage:Usd.Stage, prim_name) -> Optional[Usd.Prim]:
         for prim in stage.TraverseAll():
             if prim.GetName() == prim_name:
                 return prim
@@ -220,6 +224,7 @@ class RigCarPhysicsUtils():
     @staticmethod
     def rig_car_joins():
 
+        # Create Revolute Joints
         all_revolute_joins_info = [{'from':'chassis', 'to':'wheels_B'},
                                    {'from':'chassis', 'to':'wheels_F'},
                                    {'from':'motor_body', 'to':'gear_drive'}]
@@ -227,26 +232,98 @@ class RigCarPhysicsUtils():
         for revolute_join_info in all_revolute_joins_info:
             RigCarPhysicsUtils.create_revolute_joins(revolute_join_info['from'], revolute_join_info['to'])
 
+        # Create Fixed Joints
         all_fixed_joins_info = [{'from':'chassis', 'to':'motor_body'},
                                 {'from':'chassis', 'to':'battery'}]
         
         for fixed_join_info in all_fixed_joins_info:
             RigCarPhysicsUtils.create_fixed_join(fixed_join_info['from'], fixed_join_info['to'])
 
+        # Create Gear Joints
         all_gear_joins_info = [{'from':'gear_drive', 'to':'wheels_F', 'gear_ratio':-0.33}]
         for gear_join_info in all_gear_joins_info:
             RigCarPhysicsUtils.create_gear_join(gear_join_info['from'], gear_join_info['to'], gear_join_info['gear_ratio'])
 
+        #  Replace Wheel Colliders with Cylinders
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         wheel_mesh_id = '44309'
         all_wheel_meshes = RigCarPhysicsUtils.find_all_prim_contains_pattern(stage, wheel_mesh_id)
+        all_wheel_meshes = [wheel_mesh for wheel_mesh in all_wheel_meshes if 'collider' not in wheel_mesh.GetName()]
         for wheel_mesh in all_wheel_meshes:
             RigCarPhysicsUtils.replace_wheels_colliders(wheel_mesh)
+
+
+        # Add Forces
+        all_forces_info =[{'prim_name':'wheels_F'},
+                          {'prim_name': 'gear_drive'}]
+        for force_info in all_forces_info:
+            RigCarPhysicsUtils.add_force(force_info['prim_name'])
+
+        # Add Physics Materials to the Ground an Wheels
+        RigCarPhysicsUtils.add_physics_materials()
+
+
+    @staticmethod
+    def add_physics_materials():
+        
+        stage:Usd.Stage = omni.usd.get_context().get_stage()
+
+        default_prim_path = stage.GetDefaultPrim().GetPath()
+        ground_mat_path = default_prim_path.AppendPath('ground_physics_material')
+
+        if not stage.GetPrimAtPath(ground_mat_path):
+            omni.kit.commands.execute('AddRigidBodyMaterialCommand',
+                                    stage=stage,
+                                    path=str(ground_mat_path))
+            
+            ground_collision_plane = RigCarPhysicsUtils.find_prim_by_name(stage, 'CollisionPlane')
+        
+            omni.kit.commands.execute('BindMaterialExt',
+                                    material_path=str(ground_mat_path),
+                                    prim_path=[str(ground_collision_plane.GetPath())],
+                                    strength=['weakerThanDescendants'],
+                                    material_purpose='physics')
+        
+        wheels_mat_path = default_prim_path.AppendPath('wheels_physics_material')
+        if not stage.GetPrimAtPath(wheels_mat_path):
+            omni.kit.commands.execute('AddRigidBodyMaterialCommand',
+                                    stage=stage,
+                                    path=str(wheels_mat_path))
+        
+            all_wheels_prims = RigCarPhysicsUtils.find_all_prim_contains_pattern(stage, '44309')
+            all_wheels_prims = [prim for prim in all_wheels_prims if 'collider' in prim.GetName()]
+
+            for wheel_prim in all_wheels_prims:
+                omni.kit.commands.execute('BindMaterialExt',
+                                        material_path=str(wheels_mat_path),
+                                        prim_path=[str(wheel_prim.GetPath())],
+                                        strength=['weakerThanDescendants'],
+                                        material_purpose='physics')
+
+
+
+
+    @staticmethod
+    def add_force(prim_name:str):
+
+        stage:Usd.Stage = omni.usd.get_context().get_stage()
+        prim = RigCarPhysicsUtils.find_prim_by_name(stage, prim_name)
+
+        if not prim.HasAttribute('physxForce:force'):
+
+            omni.kit.commands.execute('AddPhysicsComponent',
+                usd_prim=prim,
+                component='ForceAPI')
+
 
 
 
     @staticmethod
     def replace_wheels_colliders(wheel_prim:Usd.Prim):
+
+        # Check if the wheel has already a collider that needs to be replaced
+        if not wheel_prim.HasAttribute('physics:collisionEnabled'):
+            return
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
 
