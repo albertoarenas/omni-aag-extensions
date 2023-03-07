@@ -1,6 +1,7 @@
 import re
 import pathlib
 import json
+from collections import UserDict
 from typing import List, Optional, Union
 
 import logging
@@ -12,36 +13,78 @@ import omni.kit.commands
 import omni.usd
 import omni.client
 
-class RigCarRecipe():
+# class RigPhysicsRecipe():
     
-    def __init__(self):
-        self.url = None
-        self.json_data = None
+#     def __init__(self):
+#         self.url = None
+#         self.json_data = None
 
-    def load(self, url:str):
+#     def load(self, url:str):
+#         self.url = url
+#         (result, version, content) = omni.client.read_file(self.url)
+#         if result == omni.client.Result.OK:
+#             self.json_data = json.loads(memoryview(content).tobytes())
+
+#     def __str__(self):
+#         if self.json_data:
+#             return json.dumps(self.json_data, indent=4)
+#         else:
+#             return ""
+
+
+
+class RigPhysicsRecipe(UserDict):
+
+    def __init__(self, url=None, **kwargs):
+
+        super().__init__(**kwargs)
+
         self.url = url
-        (result, version, content) = omni.client.read_file(self.url)
-        if result == omni.client.Result.OK:
-            self.json_data = json.loads(memoryview(content).tobytes())
+        if url:
+            (result, version, content) = omni.client.read_file(self.url)
+            if result == omni.client.Result.OK:
+                self.json_data = json.loads(memoryview(content).tobytes())
+                self.data.update(self.json_data)
 
-    def __str__(self):
+    def __repr__(self) -> str:
         if self.json_data:
             return json.dumps(self.json_data, indent=4)
         else:
             return ""
+                
+    # def __getitem__(self, key):
+    #     return self.data[key]
+
+    # def __setitem__(self, key, value):
+    #     self.data[key] = value
+
+    # def __delitem__(self, key):
+    #     del self.data[key]
 
 
-class RigCarPhysicsUtils():
+class RigPhysicsCooker():
 
     # Define the regular expression pattern to match a URL
     url_pattern = r'^(?:omniverse)://(?P<domain>[^/]+)(?P<path>/.*)?$'
 
-    def __init__(self):
-        pass
+    def __init__(self, recipe):
+        self.recipe = recipe
+
+    def cook(self):
+
+        if self.recipe.get('create_physics_layer', False):
+            self.create_physics_layer()
+
+        self.create_physics_layer()
+        self.create_rigidbodies_colliders()
+        self.create_collision_group()
+        self.create_masses()
+        self.rig_car_joins()
+
 
     
-    @staticmethod
-    def create_physics_layer():   
+
+    def create_physics_layer(self):   
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         
         # Get the root layer
@@ -53,7 +96,7 @@ class RigCarPhysicsUtils():
         physics_layer_name = None
         omni_protocol = "omniverse://"
         if omni_protocol in root_layer_url:
-            result = re.match(RigCarPhysicsUtils.url_pattern, root_layer_url)
+            result = re.match(RigPhysicsCooker.url_pattern, root_layer_url)
             url_domain = result.group('domain')
             url_path = result.group('path')
             logger.info(f"Root layer path domain: {url_domain}")
@@ -142,12 +185,12 @@ class RigCarPhysicsUtils():
             return False
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
-        geo_prim:Usd.Prim = RigCarPhysicsUtils.find_xform_by_name(stage, geo_prim_name)
+        geo_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, geo_prim_name)
         
         physics_actors_prims = None
         if geo_prim and geo_prim.IsValid():
             geo_prim_path_str = str(geo_prim.GetPath())
-            all_xforms = RigCarPhysicsUtils.find_xforms(stage)
+            all_xforms = RigPhysicsCooker.find_xforms(stage)
             physics_actors_prims = [xform for xform in all_xforms 
                                     if (geo_prim_path_str in str(xform.GetPath())) and 
                                         (xform != geo_prim) and
@@ -209,7 +252,7 @@ class RigCarPhysicsUtils():
             stage:Usd.Stage = omni.usd.get_context().get_stage()
 
             # Find the prim
-            all_prims = RigCarPhysicsUtils.find_all_prim_contains_pattern(stage, mass_info['id'])
+            all_prims = RigPhysicsCooker.find_all_prim_contains_pattern(stage, mass_info['id'])
 
             for cur_prim in all_prims:
                 
@@ -219,7 +262,7 @@ class RigCarPhysicsUtils():
                     parent_path = cur_prim.GetPath().GetParentPath()
                     prim_add_mass = stage.GetPrimAtPath(parent_path)
 
-                RigCarPhysicsUtils.create_and_update_mass(prim_add_mass, mass_info['mass'])
+                RigPhysicsCooker.create_and_update_mass(prim_add_mass, mass_info['mass'])
     
                 
     @staticmethod
@@ -245,37 +288,37 @@ class RigCarPhysicsUtils():
                                    {'from':'motor_body', 'to':'gear_drive'}]
         
         for revolute_join_info in all_revolute_joins_info:
-            RigCarPhysicsUtils.create_revolute_joins(revolute_join_info['from'], revolute_join_info['to'])
+            RigPhysicsCooker.create_revolute_joins(revolute_join_info['from'], revolute_join_info['to'])
 
         # Create Fixed Joints
         all_fixed_joins_info = [{'from':'chassis', 'to':'motor_body'},
                                 {'from':'chassis', 'to':'battery'}]
         
         for fixed_join_info in all_fixed_joins_info:
-            RigCarPhysicsUtils.create_fixed_join(fixed_join_info['from'], fixed_join_info['to'])
+            RigPhysicsCooker.create_fixed_join(fixed_join_info['from'], fixed_join_info['to'])
 
         # Create Gear Joints
         all_gear_joins_info = [{'from':'gear_drive', 'to':'wheels_F', 'gear_ratio':-0.33}]
         for gear_join_info in all_gear_joins_info:
-            RigCarPhysicsUtils.create_gear_join(gear_join_info['from'], gear_join_info['to'], gear_join_info['gear_ratio'])
+            RigPhysicsCooker.create_gear_join(gear_join_info['from'], gear_join_info['to'], gear_join_info['gear_ratio'])
 
         #  Replace Wheel Colliders with Cylinders
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         wheel_mesh_id = '44309'
-        all_wheel_meshes = RigCarPhysicsUtils.find_all_prim_contains_pattern(stage, wheel_mesh_id)
+        all_wheel_meshes = RigPhysicsCooker.find_all_prim_contains_pattern(stage, wheel_mesh_id)
         all_wheel_meshes = [wheel_mesh for wheel_mesh in all_wheel_meshes if 'collider' not in wheel_mesh.GetName()]
         for wheel_mesh in all_wheel_meshes:
-            RigCarPhysicsUtils.replace_wheels_colliders(wheel_mesh)
+            RigPhysicsCooker.replace_wheels_colliders(wheel_mesh)
 
 
         # Add Forces
         all_forces_info =[{'prim_name':'wheels_F'},
                           {'prim_name': 'gear_drive'}]
         for force_info in all_forces_info:
-            RigCarPhysicsUtils.add_force(force_info['prim_name'])
+            RigPhysicsCooker.add_force(force_info['prim_name'])
 
         # Add Physics Materials to the Ground an Wheels
-        RigCarPhysicsUtils.add_physics_materials()
+        RigPhysicsCooker.add_physics_materials()
 
 
     @staticmethod
@@ -291,7 +334,7 @@ class RigCarPhysicsUtils():
                                     stage=stage,
                                     path=str(ground_mat_path))
             
-            ground_collision_plane = RigCarPhysicsUtils.find_prim_by_name(stage, 'CollisionPlane')
+            ground_collision_plane = RigPhysicsCooker.find_prim_by_name(stage, 'CollisionPlane')
         
             omni.kit.commands.execute('BindMaterialExt',
                                     material_path=str(ground_mat_path),
@@ -305,7 +348,7 @@ class RigCarPhysicsUtils():
                                     stage=stage,
                                     path=str(wheels_mat_path))
         
-            all_wheels_prims = RigCarPhysicsUtils.find_all_prim_contains_pattern(stage, '44309')
+            all_wheels_prims = RigPhysicsCooker.find_all_prim_contains_pattern(stage, '44309')
             all_wheels_prims = [prim for prim in all_wheels_prims if 'collider' in prim.GetName()]
 
             for wheel_prim in all_wheels_prims:
@@ -322,7 +365,7 @@ class RigCarPhysicsUtils():
     def add_force(prim_name:str):
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
-        prim = RigCarPhysicsUtils.find_prim_by_name(stage, prim_name)
+        prim = RigPhysicsCooker.find_prim_by_name(stage, prim_name)
 
         if not prim.HasAttribute('physxForce:force'):
 
@@ -373,7 +416,7 @@ class RigCarPhysicsUtils():
         
         # Get mass info
         mass = wheel_prim.GetAttribute('physics:mass').Get()
-        RigCarPhysicsUtils.create_and_update_mass(new_collider_prim, mass)
+        RigPhysicsCooker.create_and_update_mass(new_collider_prim, mass)
 
         # Remove Collision from the wheel
         omni.kit.commands.execute('RemovePhysicsComponent',
@@ -403,11 +446,11 @@ class RigCarPhysicsUtils():
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         new_joint_name = f"GJ_{from_prim_name}_{to_prim_name}"
-        existing_joint = RigCarPhysicsUtils.find_prim_by_name(stage, new_joint_name)
+        existing_joint = RigPhysicsCooker.find_prim_by_name(stage, new_joint_name)
         if not existing_joint:
 
-            from_prim:Usd.Prim = RigCarPhysicsUtils.find_xform_by_name(stage, from_prim_name)
-            to_prim:Usd.Prim = RigCarPhysicsUtils.find_xform_by_name(stage, to_prim_name)
+            from_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, from_prim_name)
+            to_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, to_prim_name)
 
             (_, new_joint) = omni.kit.commands.execute('CreateJointCommand',
                                                         stage=stage,
@@ -416,7 +459,7 @@ class RigCarPhysicsUtils():
                                                         to_prim=to_prim)
             
             # find from_prim revolute join
-            from_prim_revolute_join = RigCarPhysicsUtils.get_child_revolute_join(from_prim)
+            from_prim_revolute_join = RigPhysicsCooker.get_child_revolute_join(from_prim)
             logger.info(from_prim_revolute_join)
 
             omni.kit.commands.execute('AddRelationshipTarget',
@@ -424,7 +467,7 @@ class RigCarPhysicsUtils():
                 target=from_prim_revolute_join.GetPath())
 
             
-            to_prim_revolute_join = RigCarPhysicsUtils.get_child_revolute_join(to_prim)
+            to_prim_revolute_join = RigPhysicsCooker.get_child_revolute_join(to_prim)
             logger.info(to_prim_revolute_join)
             omni.kit.commands.execute('AddRelationshipTarget',
                 relationship=new_joint.GetRelationship('physics:hinge1'),
@@ -462,11 +505,11 @@ class RigCarPhysicsUtils():
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         new_joint_name = f"GJ_{from_prim_name}_{to_prim_name}"
-        existing_joint = RigCarPhysicsUtils.find_prim_by_name(stage, new_joint_name)
+        existing_joint = RigPhysicsCooker.find_prim_by_name(stage, new_joint_name)
         if not existing_joint:
 
-            from_prim:Usd.Prim = RigCarPhysicsUtils.find_xform_by_name(stage, from_prim_name)
-            to_prim:Usd.Prim = RigCarPhysicsUtils.find_xform_by_name(stage, to_prim_name)
+            from_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, from_prim_name)
+            to_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, to_prim_name)
 
             (_, new_joint) = omni.kit.commands.execute('CreateJointCommand',
                                                         stage=stage,
@@ -489,11 +532,11 @@ class RigCarPhysicsUtils():
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         new_joint_name = f"RJ_{from_prim_name}_{to_prim_name}"
-        existing_joint = RigCarPhysicsUtils.find_prim_by_name(stage, new_joint_name)
+        existing_joint = RigPhysicsCooker.find_prim_by_name(stage, new_joint_name)
         if not existing_joint:
 
-            from_prim:Usd.Prim = RigCarPhysicsUtils.find_xform_by_name(stage, from_prim_name)
-            to_prim:Usd.Prim = RigCarPhysicsUtils.find_xform_by_name(stage, to_prim_name)
+            from_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, from_prim_name)
+            to_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, to_prim_name)
 
             (_, new_joint) = omni.kit.commands.execute('CreateJointCommand',
                                                         # stage=Usd.Stage.Open(rootLayer=Sdf.Find(root_layer), sessionLayer=Sdf.Find('anon:000002114D16DD80'), pathResolverContext=None),

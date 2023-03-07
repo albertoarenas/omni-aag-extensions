@@ -1,4 +1,5 @@
 {
+    "create_physics_layer": true,
     "geometry_root_prim": "Geo",
     "physics_layer_suffix": "physics",
     "all_fixed_joins_info": [

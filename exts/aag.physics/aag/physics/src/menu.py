@@ -10,7 +10,7 @@ import omni.usd
 
 # from .commands import CreateLookAtConstraint
 # from .lookat_constraint import LookAtConstraint
-from .rig_car import RigCarPhysicsUtils, RigCarRecipe
+from .rig_car import RigPhysicsCooker, RigPhysicsRecipe
 
 class PhysicsMenu:
     def __init__(self):
@@ -43,16 +43,14 @@ class PhysicsMenu:
     def _rig_car_on_clicked(self):
         #omni.kit.commands.execute("CreateLookAtConstraint", eye=None, target=None)
         logger.info("_rig_car_on_clicked")
-        recipe = RigCarRecipe()
+        
         url = "omniverse://586893a3-c6df-4743-bf39-08a38b37a332.cne.ngc.nvidia.com/Projects/LiveEdit/Friday_Live/DirectorLive/RepositoryStaging/assets/prop/lego/lego_car_v1/rig_recipe.json"
-        recipe.load(url)
+        recipe = RigPhysicsRecipe(url)
         logger.info(recipe)
 
-        RigCarPhysicsUtils.create_physics_layer()
-        RigCarPhysicsUtils.create_rigidbodies_colliders()
-        RigCarPhysicsUtils.create_collision_group()
-        RigCarPhysicsUtils.create_masses()
-        RigCarPhysicsUtils.rig_car_joins()
+        recipe_cooker = RigPhysicsCooker(recipe)
+        recipe_cooker.cook()
+        
         
 
 
