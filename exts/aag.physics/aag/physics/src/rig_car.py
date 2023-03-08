@@ -75,14 +75,54 @@ class RigPhysicsCooker():
         if self.recipe.get('create_physics_layer', False):
             self.create_physics_layer()
 
-        self.create_physics_layer()
-        self.create_rigidbodies_colliders()
-        self.create_collision_group()
-        self.create_masses()
-        self.rig_car_joins()
+        
+        actor_prims_parent_name = self.recipe.get('actor_prims_parent_name', 'Geo')
+        self.create_rigidbodies_colliders(actor_prims_parent_name)
+
+        physics_scope_prim:Usd.Prim = self.create_physics_scope()
+        
+        collision_group_path = self.recipe.get('collision_group_path', '/World/Physics/CollisionGroup')
+        self.create_collision_group(collision_group_path, actor_prims_parent_name)
+        
+        all_mass_info = self.recipe.get('all_mass_info', [])
+        self.create_masses(all_mass_info)
+
+        # Create Revolute Joints
+        all_revolute_joins_info = self.recipe.get('all_revolute_joins_info', [])
+        for revolute_join_info in all_revolute_joins_info:
+            self.create_revolute_joins(revolute_join_info['from'], 
+                                       revolute_join_info['to'],
+                                       revolute_join_info['axis_name'])
+            
+        # Create Fixed Joints
+        all_fixed_joins_info = self.recipe.get('all_fixed_joins_info', [])
+        for fixed_join_info in all_fixed_joins_info:
+            self.create_fixed_join(fixed_join_info['from'], fixed_join_info['to'])
+
+        # Create Gear Joints
+        all_gear_joins_info = self.recipe.get('all_gear_joins_info', [])
+        for gear_join_info in all_gear_joins_info:
+            self.create_gear_join(gear_join_info['from'], gear_join_info['to'], gear_join_info['gear_ratio'])
+
+        #  Replace Wheel Colliders with Cylinders
+        tire_mesh_id = self.recipe.get('tire_mesh_id', '44309')
+        self.replace_all_tires_colliders(tire_mesh_id)
+
+        # Add Forces
+        all_forces_info = self.recipe.get('all_forces_info', [])
+        for force_info in all_forces_info:
+            self.add_force(force_info['prim_name'])
 
 
-    
+         # Add Physics Materials to the Ground an Wheels
+        self.add_tires_physics_materials(tire_mesh_id, physics_scope_prim.GetPath())
+
+
+    def create_physics_scope(self):
+        stage:Usd.Stage = omni.usd.get_context().get_stage()
+        scope_prim = stage.DefinePrim("/World/Physics", "Scope")
+        return scope_prim
+
 
     def create_physics_layer(self):   
         stage:Usd.Stage = omni.usd.get_context().get_stage()
@@ -141,41 +181,12 @@ class RigPhysicsCooker():
             layer_identifier=physics_layer_url)
 
 
-    @staticmethod
-    def find_prim_by_name(stage:Usd.Stage, prim_name) -> Optional[Usd.Prim]:
-        for prim in stage.TraverseAll():
-            if prim.GetName() == prim_name:
-                return prim
-        return None
     
-    @staticmethod
-    def find_all_prim_contains_pattern(stage:Usd.Stage, pattern) -> List[Usd.Prim]:
-        all_prims = []
-        for prim in stage.Traverse(Usd.TraverseInstanceProxies(Usd.PrimIsActive and Usd.PrimIsDefined and Usd.PrimIsLoaded)):
-            if pattern in prim.GetName():
-                all_prims.append(prim)
-        return all_prims
-
-    @staticmethod
-    def find_xform_by_name(stage:Usd.Stage, prim_name:str) -> Optional[Usd.Prim]: 
-        for prim in stage.TraverseAll():
-            if prim.GetName() == prim_name and prim.IsA(UsdGeom.Xform) and prim.IsActive():
-                return prim
-        return None
-
-    @staticmethod
-    def find_xforms(stage:Usd.Stage):
-        xforms = []
-        # stage.Traverse(Usd.TraverseInstanceProxies(Usd.PrimIsActive and Usd.PrimIsDefined and Usd.PrimIsLoaded))
-        for prim in stage.Traverse():
-            if prim.IsA(UsdGeom.Xform) and prim.IsActive():
-                xforms.append(prim)
-        return xforms
     
-    @staticmethod
-    def create_rigidbodies_colliders(geo_prim_name="Geo"):
+    
+    def create_rigidbodies_colliders(self, actor_prims_parent_name="Geo"):
 
-        def is_parent_xform(prim):
+        def is_actor_parent(prim):
 
             children = prim.GetFilteredChildren(Usd.PrimIsDefined & ~Usd.PrimIsAbstract & Usd.PrimIsActive)
             for child in children:
@@ -183,18 +194,24 @@ class RigPhysicsCooker():
                     return True
                 
             return False
+        
+        def is_child(parent_prim, child_prim):
+            if str(parent_prim.GetPath()) in str(child_prim.GetPath()):
+                return True
+            else:
+                return False
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
-        geo_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, geo_prim_name)
+        actors_parent_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, actor_prims_parent_name)
         
         physics_actors_prims = None
-        if geo_prim and geo_prim.IsValid():
-            geo_prim_path_str = str(geo_prim.GetPath())
+        if actors_parent_prim and actors_parent_prim.IsValid():
+            
             all_xforms = RigPhysicsCooker.find_xforms(stage)
             physics_actors_prims = [xform for xform in all_xforms 
-                                    if (geo_prim_path_str in str(xform.GetPath())) and 
-                                        (xform != geo_prim) and
-                                        not is_parent_xform(xform)]
+                                    if is_child(actors_parent_prim, xform) and 
+                                        (xform != actors_parent_prim) and
+                                        not is_actor_parent(xform)]
 
         logger.info(physics_actors_prims)
 
@@ -206,12 +223,14 @@ class RigPhysicsCooker():
                     approximationShape='convexHull',
                     kinematic=False)
                 
-    @staticmethod
-    def create_collision_group(collision_group_path = '/World/CollisionGroup', geo_path = '/World/Geo'):
+
+    def create_collision_group(self, collision_group_path = '/World/CollisionGroup', actors_parent_name='Geo'):
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
+        actors_parent_prim:Usd.Prim = RigPhysicsCooker.find_xform_by_name(stage, actors_parent_name)
+        actors_parent_path = actors_parent_prim.GetPath()
 
-        collision_group_prim = stage.GetPrimAtPath(collision_group_path)
+        collision_group_prim:Usd.Prim = stage.GetPrimAtPath(collision_group_path)
         if not collision_group_prim:
 
             omni.kit.commands.execute('AddCollisionGroupCommand',
@@ -222,7 +241,7 @@ class RigPhysicsCooker():
 
             omni.kit.commands.execute('AddRelationshipTarget',
                 relationship=collision_group_prim.GetRelationship('collection:colliders:includes'),
-                target=Sdf.Path(geo_path))
+                target=actors_parent_path)
             
 
             omni.kit.commands.execute('AddRelationshipTarget',
@@ -231,21 +250,7 @@ class RigPhysicsCooker():
             
 
 
-    @staticmethod
-    def create_masses():
-
-        all_mass_info = [{'id':'11955', 'mass':0.2, 'apply_parent':False},
-                         {'id':'47157', 'mass':0.43, 'apply_parent':False},
-                         {'id':'23948', 'mass':1.65, 'apply_parent':False},
-                         {'id':'3034', 'mass':2.27, 'apply_parent':False},
-                         {'id':'32530', 'mass':0.64, 'apply_parent':False},
-                         {'id':'3648', 'mass':1.17, 'apply_parent':False},
-                         {'id':'3703', 'mass':5.87, 'apply_parent':False},
-                         {'id':'44309', 'mass':11.15, 'apply_parent':False},
-                         {'id':'4519', 'mass':0.43, 'apply_parent':False},
-                         {'id':'54087', 'mass':4.33, 'apply_parent':False},
-                         {'id':'59143', 'mass':33.5, 'apply_parent':True},
-                         {'id':'87513', 'mass':83.94, 'apply_parent':True},]
+    def create_masses(self, all_mass_info):
         
         for mass_info in all_mass_info:
 
@@ -262,11 +267,10 @@ class RigPhysicsCooker():
                     parent_path = cur_prim.GetPath().GetParentPath()
                     prim_add_mass = stage.GetPrimAtPath(parent_path)
 
-                RigPhysicsCooker.create_and_update_mass(prim_add_mass, mass_info['mass'])
-    
-                
-    @staticmethod
-    def create_and_update_mass(prim, mass):
+                self.create_and_update_mass(prim_add_mass, mass_info['mass'])
+
+
+    def create_and_update_mass(self, prim, mass):
         # Check if mass is already present if not
         if not prim.HasAttribute('physics:mass'):
 
@@ -279,90 +283,47 @@ class RigPhysicsCooker():
 
 
 
-    @staticmethod
-    def rig_car_joins():
 
-        # Create Revolute Joints
-        all_revolute_joins_info = [{'from':'chassis', 'to':'wheels_B'},
-                                   {'from':'chassis', 'to':'wheels_F'},
-                                   {'from':'motor_body', 'to':'gear_drive'}]
-        
-        for revolute_join_info in all_revolute_joins_info:
-            RigPhysicsCooker.create_revolute_joins(revolute_join_info['from'], revolute_join_info['to'])
-
-        # Create Fixed Joints
-        all_fixed_joins_info = [{'from':'chassis', 'to':'motor_body'},
-                                {'from':'chassis', 'to':'battery'}]
-        
-        for fixed_join_info in all_fixed_joins_info:
-            RigPhysicsCooker.create_fixed_join(fixed_join_info['from'], fixed_join_info['to'])
-
-        # Create Gear Joints
-        all_gear_joins_info = [{'from':'gear_drive', 'to':'wheels_F', 'gear_ratio':-0.33}]
-        for gear_join_info in all_gear_joins_info:
-            RigPhysicsCooker.create_gear_join(gear_join_info['from'], gear_join_info['to'], gear_join_info['gear_ratio'])
-
-        #  Replace Wheel Colliders with Cylinders
-        stage:Usd.Stage = omni.usd.get_context().get_stage()
-        wheel_mesh_id = '44309'
-        all_wheel_meshes = RigPhysicsCooker.find_all_prim_contains_pattern(stage, wheel_mesh_id)
-        all_wheel_meshes = [wheel_mesh for wheel_mesh in all_wheel_meshes if 'collider' not in wheel_mesh.GetName()]
-        for wheel_mesh in all_wheel_meshes:
-            RigPhysicsCooker.replace_wheels_colliders(wheel_mesh)
-
-
-        # Add Forces
-        all_forces_info =[{'prim_name':'wheels_F'},
-                          {'prim_name': 'gear_drive'}]
-        for force_info in all_forces_info:
-            RigPhysicsCooker.add_force(force_info['prim_name'])
-
-        # Add Physics Materials to the Ground an Wheels
-        RigPhysicsCooker.add_physics_materials()
-
-
-    @staticmethod
-    def add_physics_materials():
+    def add_tires_physics_materials(self, tire_id:str, material_path:Optional[Sdf.Path]=None):
         
         stage:Usd.Stage = omni.usd.get_context().get_stage()
 
-        default_prim_path = stage.GetDefaultPrim().GetPath()
-        ground_mat_path = default_prim_path.AppendPath('ground_physics_material')
-
-        if not stage.GetPrimAtPath(ground_mat_path):
+        if not material_path:
+            material_path = stage.GetDefaultPrim().GetPath()
+               
+        tires_mat_path = material_path.AppendPath('tires_physics_material')
+        if not stage.GetPrimAtPath(tires_mat_path):
             omni.kit.commands.execute('AddRigidBodyMaterialCommand',
                                     stage=stage,
-                                    path=str(ground_mat_path))
-            
-            ground_collision_plane = RigPhysicsCooker.find_prim_by_name(stage, 'CollisionPlane')
+                                    path=str(tires_mat_path))
         
-            omni.kit.commands.execute('BindMaterialExt',
-                                    material_path=str(ground_mat_path),
-                                    prim_path=[str(ground_collision_plane.GetPath())],
-                                    strength=['weakerThanDescendants'],
-                                    material_purpose='physics')
-        
-        wheels_mat_path = default_prim_path.AppendPath('wheels_physics_material')
-        if not stage.GetPrimAtPath(wheels_mat_path):
-            omni.kit.commands.execute('AddRigidBodyMaterialCommand',
-                                    stage=stage,
-                                    path=str(wheels_mat_path))
-        
-            all_wheels_prims = RigPhysicsCooker.find_all_prim_contains_pattern(stage, '44309')
-            all_wheels_prims = [prim for prim in all_wheels_prims if 'collider' in prim.GetName()]
+            all_tires_prims = RigPhysicsCooker.find_all_prim_contains_pattern(stage, tire_id)
+            all_tires_prims = [prim for prim in all_tires_prims if 'collider' in prim.GetName()]
 
-            for wheel_prim in all_wheels_prims:
+            for tire_prim in all_tires_prims:
                 omni.kit.commands.execute('BindMaterialExt',
-                                        material_path=str(wheels_mat_path),
-                                        prim_path=[str(wheel_prim.GetPath())],
+                                        material_path=str(tires_mat_path),
+                                        prim_path=[str(tire_prim.GetPath())],
                                         strength=['weakerThanDescendants'],
                                         material_purpose='physics')
 
+        # ground_mat_path = default_prim_path.AppendPath('ground_physics_material')
+
+        # if not stage.GetPrimAtPath(ground_mat_path):
+        #     omni.kit.commands.execute('AddRigidBodyMaterialCommand',
+        #                             stage=stage,
+        #                             path=str(ground_mat_path))
+            
+        #     ground_collision_plane = RigPhysicsCooker.find_prim_by_name(stage, 'CollisionPlane')
+        
+        #     omni.kit.commands.execute('BindMaterialExt',
+        #                             material_path=str(ground_mat_path),
+        #                             prim_path=[str(ground_collision_plane.GetPath())],
+        #                             strength=['weakerThanDescendants'],
+        #                             material_purpose='physics')
 
 
-
-    @staticmethod
-    def add_force(prim_name:str):
+    def add_force(self, prim_name:str):
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         prim = RigPhysicsCooker.find_prim_by_name(stage, prim_name)
@@ -374,10 +335,17 @@ class RigPhysicsCooker():
                 component='ForceAPI')
 
 
+    def replace_all_tires_colliders(self, wheel_mesh_id):
+        stage:Usd.Stage = omni.usd.get_context().get_stage()
+        
+        all_wheel_meshes = RigPhysicsCooker.find_all_prim_contains_pattern(stage, wheel_mesh_id)
+        all_wheel_meshes = [wheel_mesh for wheel_mesh in all_wheel_meshes if 'collider' not in wheel_mesh.GetName()]
+        for wheel_mesh in all_wheel_meshes:
+            self.replace_tire_collider(wheel_mesh)
 
 
-    @staticmethod
-    def replace_wheels_colliders(wheel_prim:Usd.Prim):
+
+    def replace_tire_collider(self, wheel_prim:Usd.Prim):
 
         # Check if the wheel has already a collider that needs to be replaced
         if not wheel_prim.HasAttribute('physics:collisionEnabled'):
@@ -416,7 +384,7 @@ class RigPhysicsCooker():
         
         # Get mass info
         mass = wheel_prim.GetAttribute('physics:mass').Get()
-        RigPhysicsCooker.create_and_update_mass(new_collider_prim, mass)
+        self.create_and_update_mass(new_collider_prim, mass)
 
         # Remove Collision from the wheel
         omni.kit.commands.execute('RemovePhysicsComponent',
@@ -441,8 +409,8 @@ class RigPhysicsCooker():
             return None    
             
 
-    @staticmethod
-    def create_gear_join(from_prim_name, to_prim_name, gear_ratio):
+    
+    def create_gear_join(self, from_prim_name, to_prim_name, gear_ratio):
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         new_joint_name = f"GJ_{from_prim_name}_{to_prim_name}"
@@ -491,17 +459,7 @@ class RigPhysicsCooker():
                                       destructive=False)
 
 
-
-
-
-
-
-
-
-
-
-    @staticmethod
-    def create_fixed_join(from_prim_name, to_prim_name):
+    def create_fixed_join(self, from_prim_name, to_prim_name):
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         new_joint_name = f"GJ_{from_prim_name}_{to_prim_name}"
@@ -526,8 +484,7 @@ class RigPhysicsCooker():
                                       destructive=False)
 
 
-    @staticmethod
-    def create_revolute_joins(from_prim_name="chassis", to_prim_name="wheels_B", axis_name='Z'):
+    def create_revolute_joins(self, from_prim_name="chassis", to_prim_name="wheels_B", axis_name='Z', joint_path:Sdf.Path=None):
         logger.info("rig_wheels()")
 
         stage:Usd.Stage = omni.usd.get_context().get_stage()
@@ -548,14 +505,44 @@ class RigPhysicsCooker():
             
             new_joint.GetAttribute("physics:axis").Set(axis_name)
 
-            wheels_prim_path:Sdf.Path = to_prim.GetPath()
-            new_joint_path = wheels_prim_path.AppendPath(new_joint_name)
+            if not joint_path:
+                joint_path = to_prim.GetPath()
+            new_joint_path = joint_path.AppendPath(new_joint_name)
             omni.kit.commands.execute('MovePrims',
                 paths_to_move={new_joint.GetPath(): new_joint_path},
                 destructive=False)
 
 
         
+    @staticmethod
+    def find_prim_by_name(stage:Usd.Stage, prim_name) -> Optional[Usd.Prim]:
+        for prim in stage.TraverseAll():
+            if prim.GetName() == prim_name:
+                return prim
+        return None
+    
+    @staticmethod
+    def find_all_prim_contains_pattern(stage:Usd.Stage, pattern) -> List[Usd.Prim]:
+        all_prims = []
+        for prim in stage.Traverse(Usd.TraverseInstanceProxies(Usd.PrimIsActive and Usd.PrimIsDefined and Usd.PrimIsLoaded)):
+            if pattern in prim.GetName():
+                all_prims.append(prim)
+        return all_prims
 
+    @staticmethod
+    def find_xform_by_name(stage:Usd.Stage, prim_name:str) -> Optional[Usd.Prim]: 
+        for prim in stage.TraverseAll():
+            if prim.GetName() == prim_name and prim.IsA(UsdGeom.Xform) and prim.IsActive():
+                return prim
+        return None
+
+    @staticmethod
+    def find_xforms(stage:Usd.Stage):
+        xforms = []
+        # stage.Traverse(Usd.TraverseInstanceProxies(Usd.PrimIsActive and Usd.PrimIsDefined and Usd.PrimIsLoaded))
+        for prim in stage.Traverse():
+            if prim.IsA(UsdGeom.Xform) and prim.IsActive():
+                xforms.append(prim)
+        return xforms
 
 

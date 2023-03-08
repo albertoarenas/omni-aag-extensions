@@ -1,7 +1,9 @@
 {
     "create_physics_layer": true,
-    "geometry_root_prim": "Geo",
+    "actor_prims_parent_name": "Geo",
     "physics_layer_suffix": "physics",
+    "collision_group_path":"/World/Physics/CollisionGroup",
+    "tire_mesh_id": "44309",
     "all_fixed_joins_info": [
         {
             "from": "chassis",
@@ -23,84 +25,87 @@
     "all_gear_joins_info": [
         {
             "gear_ratio": 3,
-            "from": "gear_drive",
-            "to": "wheels_F"
+            "from": "wheels_F",
+            "to": "gear_drive"
         }
     ],
     "all_mass_info": [
         {
             "mass": 0.2,
-            "": "11955",
+            "id": "11955",
             "apply_parent": false
         },
         {
             "mass": 0.43,
-            "": "47157",
+            "id": "47157",
             "apply_parent": false
         },
         {
             "mass": 1.65,
-            "": "23948",
+            "id": "23948",
             "apply_parent": false
         },
         {
             "mass": 2.27,
-            "": "3034",
+            "id": "3034",
             "apply_parent": false
         },
         {
             "mass": 0.64,
-            "": "32530",
+            "id": "32530",
             "apply_parent": false
         },
         {
             "mass": 1.17,
-            "": "3648",
+            "id": "3648",
             "apply_parent": false
         },
         {
             "mass": 5.87,
-            "": "3703",
+            "id": "3703",
             "apply_parent": false
         },
         {
             "mass": 11.15,
-            "": "44309",
+            "id": "44309",
             "apply_parent": false
         },
         {
             "mass": 0.43,
-            "": "4519",
+            "id": "4519",
             "apply_parent": false
         },
         {
             "mass": 4.33,
-            "": "54087",
+            "id": "54087",
             "apply_parent": false
         },
         {
             "mass": 33.5,
-            "": "59143",
+            "id": "59143",
             "apply_parent": true
         },
         {
             "mass": 83.94,
-            "": "87513",
+            "id": "87513",
             "apply_parent": true
         }
     ],
     "all_revolute_joins_info": [
         {
             "from": "chassis",
-            "to": "wheels_B"
+            "to": "wheels_B",
+            "axis_name": "Z"
         },
         {
             "from": "chassis",
-            "to": "wheels_F"
+            "to": "wheels_F",
+            "axis_name": "Z"
         },
         {
             "from": "motor_body",
-            "to": "gear_drive"
+            "to": "gear_drive",
+            "axis_name": "Z"
         }
     ]
 }
