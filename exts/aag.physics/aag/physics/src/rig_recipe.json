@@ -3,7 +3,12 @@
     "actor_prims_parent_name": "Geo",
     "physics_layer_suffix": "physics",
     "collision_group_path":"/World/Physics/CollisionGroup",
-    "tire_mesh_id": "44309",
+    "tire_mesh_id": "11957",
+    "tire_mesh_info":{
+        "id": "11957",
+        "radius" : 5.255,
+        "height" : 1.92
+    },
     "all_fixed_joins_info": [
         {
             "from": "chassis",
@@ -30,6 +35,31 @@
         }
     ],
     "all_mass_info": [
+        {
+            "mass": 22,
+            "id": "11957",
+            "apply_parent": false
+        },
+        {
+            "mass": 17.7,
+            "id": "88517",
+            "apply_parent": false
+        },
+        {
+            "mass": 0.8,
+            "id": "44728",
+            "apply_parent": false
+        },
+        {
+            "mass": 0.14,
+            "id": "3713",
+            "apply_parent": false
+        },
+        {
+            "mass": 4.7,
+            "id": "3035",
+            "apply_parent": false
+        },
         {
             "mass": 0.2,
             "id": "11955",
@@ -83,6 +113,11 @@
         {
             "mass": 33.5,
             "id": "59143",
+            "apply_parent": true
+        },
+        {
+            "mass": 82,
+            "id": "84725",
             "apply_parent": true
         },
         {

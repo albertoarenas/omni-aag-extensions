@@ -44,8 +44,16 @@ class PhysicsMenu:
         #omni.kit.commands.execute("CreateLookAtConstraint", eye=None, target=None)
         logger.info("_rig_car_on_clicked")
         
-        url = "omniverse://586893a3-c6df-4743-bf39-08a38b37a332.cne.ngc.nvidia.com/Projects/LiveEdit/Friday_Live/DirectorLive/RepositoryStaging/assets/prop/lego/lego_car_v1/rig_recipe.json"
-        recipe = RigPhysicsRecipe(url)
+        stage:Usd.Stage = omni.usd.get_context().get_stage()
+        root_layer = stage.GetRootLayer()
+        root_layer_url = root_layer.identifier
+        fields = root_layer_url.split('/')
+        fields[-1] = 'rig_recipe.json'
+        recipe_url = '/'.join(fields)
+
+
+        # url = "omniverse://586893a3-c6df-4743-bf39-08a38b37a332.cne.ngc.nvidia.com/Projects/LiveEdit/Friday_Live/DirectorLive/RepositoryStaging/assets/prop/lego/lego_car_v1/rig_recipe.json"
+        recipe = RigPhysicsRecipe(recipe_url)
         logger.info(recipe)
 
         recipe_cooker = RigPhysicsCooker(recipe)

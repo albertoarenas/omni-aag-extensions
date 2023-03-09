@@ -105,8 +105,9 @@ class RigPhysicsCooker():
             self.create_gear_join(gear_join_info['from'], gear_join_info['to'], gear_join_info['gear_ratio'])
 
         #  Replace Wheel Colliders with Cylinders
-        tire_mesh_id = self.recipe.get('tire_mesh_id', '44309')
-        self.replace_all_tires_colliders(tire_mesh_id)
+        tire_mesh_id = self.recipe.get('tire_mesh_id', '')
+        tire_mesh_info = self.recipe.get('tire_mesh_info', {})
+        self.replace_all_tires_colliders(tire_mesh_info['id'], tire_mesh_info['radius'], tire_mesh_info['height'])
 
         # Add Forces
         all_forces_info = self.recipe.get('all_forces_info', [])
@@ -335,17 +336,17 @@ class RigPhysicsCooker():
                 component='ForceAPI')
 
 
-    def replace_all_tires_colliders(self, wheel_mesh_id):
+    def replace_all_tires_colliders(self, wheel_mesh_id, wheel_radius=2.23, wheel_height=2.16):
         stage:Usd.Stage = omni.usd.get_context().get_stage()
         
         all_wheel_meshes = RigPhysicsCooker.find_all_prim_contains_pattern(stage, wheel_mesh_id)
         all_wheel_meshes = [wheel_mesh for wheel_mesh in all_wheel_meshes if 'collider' not in wheel_mesh.GetName()]
         for wheel_mesh in all_wheel_meshes:
-            self.replace_tire_collider(wheel_mesh)
+            self.replace_tire_collider(wheel_mesh, wheel_radius, wheel_height)
 
 
 
-    def replace_tire_collider(self, wheel_prim:Usd.Prim):
+    def replace_tire_collider(self, wheel_prim:Usd.Prim, wheel_radius, wheel_height):
 
         # Check if the wheel has already a collider that needs to be replaced
         if not wheel_prim.HasAttribute('physics:collisionEnabled'):
@@ -364,8 +365,6 @@ class RigPhysicsCooker():
         new_collider_path = wheel_prim_parent_path.AppendPath(new_collider_name)
 
         # Create collider shape prim
-        wheel_radius = 2.23
-        wheel_height = 2.16
         omni.kit.commands.execute('CreatePrimWithDefaultXform',
             prim_type='Cylinder',
             prim_path=str(new_collider_path),
